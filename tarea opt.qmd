@@ -1,0 +1,191 @@
+---
+title: "tarea 1 opt"
+author: "Almendra Jara"
+format: html
+editor: visual
+---
+
+## #Tarea trabajo nr 1
+
+en el presente trabajo se ocupara la base de datos ENUSC 2023 Chile con el objetivo de indagar en las variables:
+
+-   P_INSEG_OSCURO_1 \# Durante los últimos doce meses ¿qué tan seguro/a se siente en las siguientes situaciones? Caminando solo/a por su barrio cuando ya está oscuro
+
+-   P_INSEG_DIA_1 #Durante los últimos doce meses ¿qué tan seguro/a se siente en las siguientes situaciones? Caminando solo/a por su barrio durante el día
+
+-   rph_sexo #sexo
+
+    En base a estas variables se buscara indagar en la persepcion de inseguridad que presentan mujeres y hombres en su barrio, caminando de dia o de noche. De esta manera se pretende ver si hay alguna diferencia en como la persepcion de inseguridad varia segun sexo y segun la hora del dia.
+
+    ## 1. cargar paquetes
+
+    primero se deben de cargar los paquetes a utilizar, para esto se ocupara "pacman"
+
+```{r}
+pacman::p_load(sjlabelled,haven,
+               dplyr, #Manipulacion de datos
+               stargazer, #Tablas
+               sjmisc, # Tablas
+               summarytools, # Tablas
+               kableExtra, #Tablas
+               sjPlot, #Tablas y gráficos
+               corrplot, # Correlaciones
+               sessioninfo, # Información de la sesión de trabajo
+               ggplot2,# Para la mayoría de los gráficos
+               car)#creacion de graficos y regresion lineal 
+
+```
+
+luego de correr el codigo, se debe cargar la base de datos seleccionada, en este caso se utilizara la base de datos de la ENUSC2023 . Esta base de datos debe de estar cargada en la carpeta "input" siguiendo el procedimiento ipo
+
+### 1.1 Cargar base de datos
+
+```{r}
+base_enusc2023 <- read_sav("input/base-usuario-20-enusc-2023bf436364553a489fab8e92a1ef14a520.sav")
+
+
+```
+
+### 1.2 filtrar la base de datos
+
+se filtra la base de datos con las variables que vamos a utilizar y se comprueba con la funcion "names"
+
+```{r}
+base_filtrada <- base_enusc2023 %>% select(P_INSEG_OSCURO_1, P_INSEG_DIA_1,rph_sexo)
+
+names(base_filtrada)
+```
+
+### 1.3 clasificar NA y omitirlos
+
+clasificamos los no aplica(85), no sabe (88) y no responde (99) como NA en toda la base, es decir como casos perdidos
+
+```{r}
+base_filtrada<- base_filtrada %>% set_na(., na = c(85,88,99))
+base_filtrada<-na.omit(base_filtrada)
+dim(base_filtrada)
+```
+
+## 2. recodificacion de las variables
+
+### 2.1 variable P_INSEG_OSCURO_1
+
+generamos una tabla de frecuencia para ver los valores de la variable P_INSEG_OSCURO_1
+
+```{r}
+frq(base_filtrada$P_INSEG_OSCURO_1)
+```
+
+recodificamos los valores y les asignamos un nombre
+
+```{r}
+base_filtrada$P_INSEG_OSCURO_1 <- car::recode(base_filtrada$P_INSEG_OSCURO_1, "c(1,2)=1; c(3,4)=2")
+
+base_filtrada$P_INSEG_OSCURO_1 <- factor(base_filtrada$P_INSEG_OSCURO_1,
+                             labels = c("Inseguro/a", "Seguro/a"),
+                             levels = c(1, 2))
+
+#comprobar con tabla de frecuencia
+frq(base_filtrada$P_INSEG_OSCURO_1)
+
+```
+
+cambiamos el etiquetado de la variable
+
+```{r}
+base_filtrada<- rename(base_filtrada,"P.inseguridad_cuando_esta_oscuro"=P_INSEG_OSCURO_1)
+
+```
+
+### 2.2 variable P_INSEG_DIA_1
+
+repetimos el proceso de recodificacion con la variable P_INSEG_DIA_1
+
+```{r}
+frq(base_filtrada$P_INSEG_DIA_1) #tabla de frecuencia
+```
+
+recodificamos la variable y le asignamos nombres
+
+```{r}
+base_filtrada$P_INSEG_DIA_1 <- car::recode(base_filtrada$P_INSEG_DIA_1, "c(1,2)=1; c(3,4)=2")
+
+base_filtrada$P_INSEG_DIA_1 <- factor(base_filtrada$P_INSEG_DIA_1,
+                                         labels = c("Inseguro/a", "Seguro/a"),
+                                         levels = c(1, 2))
+
+#comprobar con tabla de frecuencia
+frq(base_filtrada$P_INSEG_DIA_1)
+```
+
+cambiamos el etiquetado de la variable
+
+```{r}
+base_filtrada<- rename(base_filtrada,"P.inseguridad_cuando_es_dia"=P_INSEG_DIA_1)
+```
+
+### 2.3 Variable rph_sexo
+
+```{r}
+frq(base_filtrada$rph_sexo) #tabla de frecuencia
+```
+
+recodificamos la variable y le asignammos nombres
+
+```{r}
+base_filtrada$rph_sexo<- car::recode(base_filtrada$rph_sexo, "1=0;2=1")
+
+base_filtrada$rph_sexo <- factor(base_filtrada$rph_sexo,
+                         labels=c( "Hombre",
+                                   "Mujer"),
+                         levels=c(0,1))
+#comprobar con tabla de frecuencia
+frq(base_filtrada$rph_sexo) 
+
+```
+
+## 3. tabla de descriptivos
+
+creamos una tabla de descriptivos sobre la persepcion de uinseguridad cuando esta oscuro y el sexo
+
+```{r}
+sjt.xtab(base_filtrada$P.inseguridad_cuando_esta_oscuro, base_filtrada$rph_sexo, encoding = "UTF-8")
+
+```
+
+## 4. graficos
+
+creamos un grafico con la persepcion de inseguirdad cuando esta oscuro
+
+```{r}
+grafico1 <-base_filtrada %>% ggplot(aes(x = P.inseguridad_cuando_esta_oscuro)) + 
+  geom_bar(fill="blue")+
+  labs(title = "persepcion de inseguridad en el barrio cuando esta oscuro",
+       x = "percepcion de inseguridad en el barrio cuando esta oscuro",
+       y = "Frecuencia")+
+theme_bw()
+grafico1
+```
+
+creamos otro grafico con la persepcion de inseguirdad cuando es de dia
+
+```{r}
+grafico2 <-base_filtrada %>% ggplot(aes(x = P.inseguridad_cuando_es_dia)) + 
+  geom_bar(fill="aquamarine")+
+  labs(title = "persepcion de inseguridad en el barrio cuando es de dia",
+       x = "percepcion de inseguridad en el barrio cuando es de dia",
+       y = "Frecuencia")+
+  theme_bw()
+grafico2
+```
+
+generamos un grafico que relacione las variables
+
+```{r}
+#generar grafico relacion entre variables
+base_filtrada %>% ggplot(aes(x =P.inseguridad_cuando_es_dia )) + 
+  geom_bar() +
+  xlab("persepcion de inseguridad en el dia") +
+  ylab("Cantidad")+
+  facet_wrap(~rph_sexo)
+```
